@@ -1,0 +1,8 @@
+import { eq } from "drizzle-orm";
+import { getDb } from "../../../db";
+import { knowledgeNotes } from "../../../db/schema";
+
+function values(body: Record<string, unknown>) { return { applicationId: Number(body.applicationId) || null, category: String(body.category || "面经").trim(), title: String(body.title || "").trim(), content: String(body.content || "").trim(), tags: String(body.tags || "").trim() }; }
+export async function POST(request: Request) { try { const data = values(await request.json()); if (!data.title) return Response.json({ error: "标题不能为空" }, { status: 400 }); const [item] = await getDb().insert(knowledgeNotes).values(data).returning(); return Response.json({ item }, { status: 201 }); } catch (error) { return Response.json({ error: error instanceof Error ? error.message : "保存失败" }, { status: 500 }); } }
+export async function PATCH(request: Request) { try { const body = await request.json() as Record<string, unknown>; const id = Number(body.id); const [item] = await getDb().update(knowledgeNotes).set({ ...values(body), updatedAt: new Date().toISOString() }).where(eq(knowledgeNotes.id, id)).returning(); return Response.json({ item }); } catch (error) { return Response.json({ error: error instanceof Error ? error.message : "保存失败" }, { status: 500 }); } }
+export async function DELETE(request: Request) { try { const id = Number(new URL(request.url).searchParams.get("id")); await getDb().delete(knowledgeNotes).where(eq(knowledgeNotes.id, id)); return Response.json({ ok: true }); } catch (error) { return Response.json({ error: error instanceof Error ? error.message : "删除失败" }, { status: 500 }); } }

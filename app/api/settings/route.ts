@@ -1,0 +1,4 @@
+import { getDb } from "../../../db";
+import { userSettings } from "../../../db/schema";
+
+export async function PUT(request: Request) { try { const body = await request.json() as Record<string, unknown>; const values = { id: 1, targetCount: Number(body.targetCount) || 0, targetIndustries: String(body.targetIndustries || "").trim(), salaryExpectation: String(body.salaryExpectation || "").trim(), reminderEnabled: Boolean(body.reminderEnabled), reminderLeadHours: Number(body.reminderLeadHours) || 24, customTags: String(body.customTags || "").trim(), updatedAt: new Date().toISOString() }; const [item] = await getDb().insert(userSettings).values(values).onConflictDoUpdate({ target: userSettings.id, set: values }).returning(); return Response.json({ item }); } catch (error) { return Response.json({ error: error instanceof Error ? error.message : "保存失败" }, { status: 500 }); } }

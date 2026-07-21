@@ -2,12 +2,13 @@ import { eq } from "drizzle-orm";
 import { getDb } from "../../../db";
 import { interviews } from "../../../db/schema";
 
-const fields = ["company", "role", "stage", "date", "time", "format", "link", "prep", "review"] as const;
-type Field = typeof fields[number];
+const textFields = ["company", "role", "stage", "date", "time", "format", "link", "address", "interviewer", "reminderAt", "notice", "prep", "review"] as const;
+type TextField = typeof textFields[number];
 
 function clean(body: Record<string, unknown>) {
-  const result = {} as Record<Field, string>;
-  for (const field of fields) result[field] = typeof body[field] === "string" ? body[field].trim() : "";
+  const result = {} as Record<TextField, string> & { applicationId: number | null };
+  for (const field of textFields) result[field] = typeof body[field] === "string" ? body[field].trim() : "";
+  result.applicationId = Number(body.applicationId) || null;
   return result;
 }
 
