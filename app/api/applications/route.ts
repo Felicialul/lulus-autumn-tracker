@@ -2,15 +2,14 @@ import { eq } from "drizzle-orm";
 import { getDb } from "../../../db";
 import { applications, timelineEvents } from "../../../db/schema";
 
-const textFields = ["company", "role", "city", "industry", "jobCategory", "team", "employmentType", "source", "referralName", "referralContact", "appliedDate", "deadlineDate", "stage", "priority", "applyUrl", "writtenDate", "firstDate", "secondDate", "nextEventDate", "responseDate", "result", "jdText", "notes"] as const;
+const textFields = ["company", "role", "city", "industry", "jobCategory", "team", "employmentType", "appliedDate", "deadlineDate", "stage", "priority", "applyUrl", "writtenDate", "firstDate", "secondDate", "nextEventDate", "responseDate", "result", "jdText", "notes"] as const;
 type TextField = typeof textFields[number];
 
 function clean(body: Record<string, unknown>) {
-  const result = {} as Record<TextField, string> & { salaryMin: number; salaryMax: number; resumeId: number | null };
+  const result = {} as Record<TextField, string> & { salaryMin: number; salaryMax: number };
   for (const field of textFields) result[field] = typeof body[field] === "string" ? body[field].trim() : "";
   result.salaryMin = Number(body.salaryMin) || 0;
   result.salaryMax = Number(body.salaryMax) || 0;
-  result.resumeId = Number(body.resumeId) || null;
   return result;
 }
 
@@ -27,7 +26,7 @@ export async function POST(request: Request) {
     if (!values.company || !values.role) return Response.json({ error: "公司名称和岗位名称不能为空" }, { status: 400 });
     const db = getDb();
     const [application] = await db.insert(applications).values(values).returning();
-    await db.insert(timelineEvents).values({ applicationId: application.id, type: "创建", title: values.stage === "待投递" ? "加入待投递清单" : `状态：${values.stage}`, occurredAt: values.appliedDate || new Date().toISOString(), notes: values.source ? `渠道：${values.source}` : "" });
+    await db.insert(timelineEvents).values({ applicationId: application.id, type: "创建", title: values.stage === "待投递" ? "加入待投递清单" : `状态：${values.stage}`, occurredAt: values.appliedDate || new Date().toISOString(), notes: "" });
     return Response.json({ application }, { status: 201 });
   } catch (error) { return Response.json({ error: messageFor(error) }, { status: 500 }); }
 }

@@ -19,11 +19,11 @@ export async function generateMetadata(): Promise<Metadata> {
   const protocol = headerStore.get("x-forwarded-proto") || "https";
   const origin = `${protocol}://${host}`;
   return {
-    title: "秋招投递管家",
+    title: "LuLu‘s 秋招投递管家",
     description: "投递、面试、Offer，一处管理。跨设备同步的个人秋招工作台。",
     icons: { icon: "/favicon.svg", shortcut: "/favicon.svg" },
-    openGraph: { title: "秋招投递管家", description: "投递、面试、Offer，一处管理。", images: [{ url: `${origin}/og.png`, width: 1536, height: 910 }] },
-    twitter: { card: "summary_large_image", title: "秋招投递管家", description: "投递、面试、Offer，一处管理。", images: [`${origin}/og.png`] },
+    openGraph: { title: "LuLu‘s 秋招投递管家", description: "投递、面试、Offer，一处管理。", images: [{ url: `${origin}/og.png`, width: 1536, height: 910 }] },
+    twitter: { card: "summary_large_image", title: "LuLu‘s 秋招投递管家", description: "投递、面试、Offer，一处管理。", images: [`${origin}/og.png`] },
   };
 }
 
