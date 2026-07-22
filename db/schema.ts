@@ -24,6 +24,7 @@ export const applications = sqliteTable("applications", {
   firstDate: text("first_date").notNull().default(""),
   secondDate: text("second_date").notNull().default(""),
   nextEventDate: text("next_event_date").notNull().default(""),
+  nextAction: text("next_action").notNull().default(""),
   responseDate: text("response_date").notNull().default(""),
   result: text("result").notNull().default("待定"),
   jdText: text("jd_text").notNull().default(""),

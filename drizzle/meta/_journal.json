@@ -15,6 +15,13 @@
       "when": 1784629492440,
       "tag": "0001_oval_alice",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1784713688157,
+      "tag": "0002_old_lyja",
+      "breakpoints": true
     }
   ]
 }
