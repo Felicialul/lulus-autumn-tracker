@@ -27,3 +27,15 @@ test("implements bounded sync, local fallback, and action-first mobile UX", asyn
   assert.match(css, /\.mobile-bottom-nav/);
   assert.match(css, /\.quick-add/);
 });
+
+test("imports applications in one batch and reports skipped duplicates", async () => {
+  const [page, route] = await Promise.all([
+    readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/api/applications/route.ts", import.meta.url), "utf8"),
+  ]);
+  assert.match(page, /JSON\.stringify\(\{items:candidates\}\)/);
+  assert.match(page, /跳过 \$\{skipped\} 条重复或空记录/);
+  assert.match(route, /const known = new Set\(current\.map\(applicationIdentity\)\)/);
+  assert.match(route, /known\.has\(key\)/);
+  assert.match(route, /known\.add\(key\)/);
+});

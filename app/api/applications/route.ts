@@ -1,6 +1,7 @@
 import { and, eq } from "drizzle-orm";
 import { getDb } from "../../../db";
 import { applications, interviews, timelineEvents } from "../../../db/schema";
+import { applicationIdentity } from "../../../lib/import-utils";
 
 const textFields = ["company", "role", "city", "industry", "jobCategory", "team", "employmentType", "appliedDate", "deadlineDate", "stage", "priority", "applyUrl", "writtenDate", "firstDate", "secondDate", "nextEventDate", "nextAction", "responseDate", "result", "jdText", "notes"] as const;
 type TextField = typeof textFields[number];
@@ -44,15 +45,37 @@ function messageFor(error: unknown) {
   return message;
 }
 
+async function createApplication(values: ReturnType<typeof clean>) {
+  const db = getDb();
+  const [application] = await db.insert(applications).values(values).returning();
+  await db.insert(timelineEvents).values({ applicationId: application.id, type: "创建", title: values.stage === "待投递" ? "加入待投递清单" : `状态：${values.stage}`, occurredAt: values.appliedDate || new Date().toISOString(), notes: "" });
+  await syncSchedule(application);
+  return application;
+}
+
 export async function POST(request: Request) {
   try {
     const body = await request.json() as Record<string, unknown>;
+    if (Array.isArray(body.items)) {
+      if (body.items.length > 1000) return Response.json({ error: "单次最多导入 1000 条记录" }, { status: 400 });
+      const db = getDb();
+      const current = await db.select({ company: applications.company, role: applications.role }).from(applications);
+      const known = new Set(current.map(applicationIdentity));
+      const created = [];
+      let skipped = 0;
+      for (const raw of body.items) {
+        if (!raw || typeof raw !== "object" || Array.isArray(raw)) { skipped++; continue; }
+        const values = clean(raw as Record<string, unknown>);
+        const key = applicationIdentity(values);
+        if (!values.company || !values.role || known.has(key)) { skipped++; continue; }
+        known.add(key);
+        created.push(await createApplication(values));
+      }
+      return Response.json({ applications: created, imported: created.length, skipped }, { status: 201 });
+    }
     const values = clean(body);
     if (!values.company || !values.role) return Response.json({ error: "公司名称和岗位名称不能为空" }, { status: 400 });
-    const db = getDb();
-    const [application] = await db.insert(applications).values(values).returning();
-    await db.insert(timelineEvents).values({ applicationId: application.id, type: "创建", title: values.stage === "待投递" ? "加入待投递清单" : `状态：${values.stage}`, occurredAt: values.appliedDate || new Date().toISOString(), notes: "" });
-    await syncSchedule(application);
+    const application = await createApplication(values);
     return Response.json({ application }, { status: 201 });
   } catch (error) { return Response.json({ error: messageFor(error) }, { status: 500 }); }
 }
