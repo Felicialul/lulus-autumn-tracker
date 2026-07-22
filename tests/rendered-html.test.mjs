@@ -40,6 +40,21 @@ test("imports applications in one batch and reports skipped duplicates", async (
   assert.match(route, /known\.add\(key\)/);
 });
 
+test("uses Microsoft YaHei across the site and exposes a complete Excel export", async () => {
+  const [page, css, exporter] = await Promise.all([
+    readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
+    readFile(new URL("../lib/export-workbook.ts", import.meta.url), "utf8"),
+  ]);
+  assert.match(css, /font-family:"Microsoft YaHei","微软雅黑"/);
+  assert.match(css, /sidebar nav button\{min-height:48px[^}]+font-size:17px/);
+  assert.match(page, /导出全部 Excel/);
+  assert.match(page, /downloadTrackerWorkbook\(data,todayYmd\(\)\)/);
+  for (const sheet of ["投递记录", "日程", "资料库", "收藏池", "时间线", "Offer对比", "附件清单", "个人设置"]) {
+    assert.match(exporter, new RegExp(`"${sheet}"`));
+  }
+});
+
 test("uses Microsoft YaHei and larger typography for applications and navigation", async () => {
   const [page, css] = await Promise.all([
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
@@ -47,7 +62,7 @@ test("uses Microsoft YaHei and larger typography for applications and navigation
   ]);
   assert.match(page, /page applications-page/);
   assert.match(css, /font-family:"Microsoft YaHei","微软雅黑"/);
-  assert.match(css, /\.sidebar nav button\{min-height:46px[^}]*font-size:15px/);
-  assert.match(css, /\.applications-page table\{font-size:14px\}/);
-  assert.match(css, /\.applications-page \.company-cell strong\{font-size:16px\}/);
+  assert.match(css, /\.sidebar nav button\{min-height:48px[^}]*font-size:17px/);
+  assert.match(css, /table\{font-size:14px\}/);
+  assert.match(css, /\.company-cell strong\{font-size:16px\}/);
 });
