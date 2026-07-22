@@ -39,3 +39,15 @@ test("imports applications in one batch and reports skipped duplicates", async (
   assert.match(route, /known\.has\(key\)/);
   assert.match(route, /known\.add\(key\)/);
 });
+
+test("uses Microsoft YaHei and larger typography for applications and navigation", async () => {
+  const [page, css] = await Promise.all([
+    readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
+  ]);
+  assert.match(page, /page applications-page/);
+  assert.match(css, /font-family:"Microsoft YaHei","微软雅黑"/);
+  assert.match(css, /\.sidebar nav button\{min-height:46px[^}]*font-size:15px/);
+  assert.match(css, /\.applications-page table\{font-size:14px\}/);
+  assert.match(css, /\.applications-page \.company-cell strong\{font-size:16px\}/);
+});
