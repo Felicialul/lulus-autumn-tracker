@@ -77,3 +77,17 @@ test("offers a confirmed delete action on every application row", async () => {
   assert.match(page, /deleteItem\(`\/api\/applications\?id=\$\{item\.id\}`/);
   assert.match(css, /\.row-delete\{/);
 });
+
+test("tracks and compares application channels", async () => {
+  const [page, route, exporter] = await Promise.all([
+    readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/api/applications/route.ts", import.meta.url), "utf8"),
+    readFile(new URL("../lib/export-workbook.ts", import.meta.url), "utf8"),
+  ]);
+  assert.match(page, /Field label="投递渠道"/);
+  assert.match(page, /投递渠道效果/);
+  assert.match(page, /平均响应/);
+  assert.match(page, /"投递渠道":"source"/);
+  assert.match(route, /"source"/);
+  assert.match(exporter, /"投递渠道": item\.source/);
+});

@@ -3,7 +3,7 @@ import { getDb } from "../../../db";
 import { applications, interviews, timelineEvents } from "../../../db/schema";
 import { applicationIdentity } from "../../../lib/import-utils";
 
-const textFields = ["company", "role", "city", "industry", "jobCategory", "team", "employmentType", "appliedDate", "deadlineDate", "stage", "priority", "applyUrl", "writtenDate", "firstDate", "secondDate", "nextEventDate", "nextAction", "responseDate", "result", "jdText", "notes"] as const;
+const textFields = ["company", "role", "city", "industry", "jobCategory", "team", "employmentType", "source", "appliedDate", "deadlineDate", "stage", "priority", "applyUrl", "writtenDate", "firstDate", "secondDate", "nextEventDate", "nextAction", "responseDate", "result", "jdText", "notes"] as const;
 type TextField = typeof textFields[number];
 
 function clean(body: Record<string, unknown>) {

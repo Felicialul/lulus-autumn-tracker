@@ -2,7 +2,7 @@ import * as XLSX from "xlsx";
 
 type ApplicationRow = {
   id: number; company: string; role: string; city: string; industry: string; jobCategory: string; team: string;
-  salaryMin: number; salaryMax: number; employmentType: string; appliedDate: string; deadlineDate: string;
+  salaryMin: number; salaryMax: number; employmentType: string; source: string; appliedDate: string; deadlineDate: string;
   stage: string; priority: string; applyUrl: string; writtenDate: string; firstDate: string; secondDate: string;
   nextEventDate: string; nextAction: string; responseDate: string; result: string; jdText: string; notes: string;
   createdAt: string; updatedAt: string;
@@ -63,12 +63,12 @@ export function createTrackerWorkbook(data: TrackerExportPayload, exportedAt = n
   const applicationRows = data.applications.map((item) => ({
     "记录ID": item.id, "公司名称": item.company, "岗位名称": item.role, "城市": item.city, "行业": item.industry,
     "岗位类型": item.jobCategory, "团队": item.team, "薪资下限(K)": item.salaryMin, "薪资上限(K)": item.salaryMax,
-    "工作类型": item.employmentType, "投递日期": item.appliedDate, "截止日期": item.deadlineDate, "当前状态": item.stage,
+    "工作类型": item.employmentType, "投递渠道": item.source, "投递日期": item.appliedDate, "截止日期": item.deadlineDate, "当前状态": item.stage,
     "优先级": item.priority, "岗位链接": item.applyUrl, "笔试时间": item.writtenDate, "一面时间": item.firstDate,
     "二面时间": item.secondDate, "下次节点": item.nextEventDate, "下一步行动": item.nextAction, "响应日期": item.responseDate,
     "结果": item.result, "JD原文": item.jdText, "备注": item.notes, "创建时间": item.createdAt, "更新时间": item.updatedAt,
   }));
-  appendSheet(workbook, "投递记录", applicationRows, ["记录ID", "公司名称", "岗位名称", "城市", "行业", "岗位类型", "团队", "薪资下限(K)", "薪资上限(K)", "工作类型", "投递日期", "截止日期", "当前状态", "优先级", "岗位链接", "笔试时间", "一面时间", "二面时间", "下次节点", "下一步行动", "响应日期", "结果", "JD原文", "备注", "创建时间", "更新时间"]);
+  appendSheet(workbook, "投递记录", applicationRows, ["记录ID", "公司名称", "岗位名称", "城市", "行业", "岗位类型", "团队", "薪资下限(K)", "薪资上限(K)", "工作类型", "投递渠道", "投递日期", "截止日期", "当前状态", "优先级", "岗位链接", "笔试时间", "一面时间", "二面时间", "下次节点", "下一步行动", "响应日期", "结果", "JD原文", "备注", "创建时间", "更新时间"]);
 
   const interviewRows = data.interviews.map((item) => ({
     "日程ID": item.id, "关联投递ID": item.applicationId, "公司名称": item.company, "岗位名称": item.role, "环节": item.stage,
