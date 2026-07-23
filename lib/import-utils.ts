@@ -1,7 +1,11 @@
 export type CompanyRole = { company: string; role: string };
 
 const COMPANY_LABELS = new Set(["公司", "公司名", "公司名称", "企业", "企业名称"]);
-const ROLE_LABELS = new Set(["岗位", "岗位名", "岗位名称", "职位", "职位名称"]);
+const ROLE_LABELS = new Set([
+  "岗位", "岗位名", "岗位名称", "职位", "职位名称",
+  "岗位/项目", "岗位／项目", "岗位项目", "项目/岗位", "项目／岗位",
+  "职位/项目", "职位／项目",
+]);
 
 function cleanValue(value: unknown) {
   return String(value ?? "")
@@ -32,6 +36,42 @@ export function uniqueCompanyRoles<T extends CompanyRole>(items: T[]) {
 
 function normalizeCompanyRole(value: Partial<CompanyRole>): CompanyRole {
   return { company: cleanValue(value.company), role: cleanValue(value.role) };
+}
+
+function cleanHeader(value: unknown) {
+  return cleanValue(value).replace(/\s+/g, "");
+}
+
+export function companyRolesFromTable(rows: unknown[][]) {
+  const useful = rows
+    .map((row) => row.map(cleanValue))
+    .filter((row) => row.some(Boolean));
+  const headerIndex = useful.findIndex(
+    (row) => row.some((cell) => COMPANY_LABELS.has(cleanHeader(cell)))
+      && row.some((cell) => ROLE_LABELS.has(cleanHeader(cell))),
+  );
+  if (headerIndex < 0) return [];
+  const companyIndex = useful[headerIndex].findIndex((cell) => COMPANY_LABELS.has(cleanHeader(cell)));
+  const roleIndex = useful[headerIndex].findIndex((cell) => ROLE_LABELS.has(cleanHeader(cell)));
+  return uniqueCompanyRoles(
+    useful.slice(headerIndex + 1).map((row) => normalizeCompanyRole({
+      company: row[companyIndex],
+      role: row[roleIndex],
+    })),
+  );
+}
+
+export function selectBestCompanyRoleRows(sheets: { name: string; rows: unknown[][] }[]) {
+  let best: { rows: unknown[][]; score: number } | null = null;
+  for (const sheet of sheets) {
+    const records = companyRolesFromTable(sheet.rows);
+    if (!records.length) continue;
+    const preferred = /投递清单|投递记录|岗位清单|职位清单|收藏池|收藏夹/u.test(sheet.name);
+    const summary = /概览|汇总|时间线|索引|说明/u.test(sheet.name);
+    const score = records.length + (preferred ? 10000 : 0) - (summary ? 1000 : 0);
+    if (!best || score > best.score) best = { rows: sheet.rows, score };
+  }
+  return best?.rows || [];
 }
 
 function parseLabeledText(source: string) {
@@ -67,10 +107,10 @@ function parseDelimitedText(source: string) {
   if (!separator) return [];
 
   const table = lines.map((line) => line.split(separator).map(cleanValue));
-  const headerIndex = table.findIndex((row) => row.some((cell) => COMPANY_LABELS.has(cell)) && row.some((cell) => ROLE_LABELS.has(cell)));
+  const headerIndex = table.findIndex((row) => row.some((cell) => COMPANY_LABELS.has(cleanHeader(cell))) && row.some((cell) => ROLE_LABELS.has(cleanHeader(cell))));
   if (headerIndex >= 0) {
-    const companyIndex = table[headerIndex].findIndex((cell) => COMPANY_LABELS.has(cell));
-    const roleIndex = table[headerIndex].findIndex((cell) => ROLE_LABELS.has(cell));
+    const companyIndex = table[headerIndex].findIndex((cell) => COMPANY_LABELS.has(cleanHeader(cell)));
+    const roleIndex = table[headerIndex].findIndex((cell) => ROLE_LABELS.has(cleanHeader(cell)));
     return uniqueCompanyRoles(table.slice(headerIndex + 1).map((row) => normalizeCompanyRole({ company: row[companyIndex], role: row[roleIndex] })));
   }
 

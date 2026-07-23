@@ -3,7 +3,9 @@ import test from "node:test";
 
 import {
   applicationIdentity,
+  companyRolesFromTable,
   prospectsFromText,
+  selectBestCompanyRoleRows,
   uniqueCompanyRoles,
 } from "../lib/import-utils.ts";
 
@@ -49,4 +51,25 @@ test("uses the same normalized company-role identity for duplicate filtering", (
       { company: "宝马", role: "管培生" },
     ],
   );
+});
+
+test("finds 岗位/项目 in the relevant sheet instead of stopping at the overview", () => {
+  const overview = [
+    ["Lyra｜27届秋招投递汇总"],
+    ["秋招主清单：已投递", 65],
+  ];
+  const applications = [
+    ["序号", "类型", "公司", "岗位/项目", "地点"],
+    [1, "秋招主清单", "懂车帝", "产品&运营岗", "上海"],
+    [2, "秋招主清单", "韶音科技", "产品GTM培训生", "深圳"],
+  ];
+  const rows = selectBestCompanyRoleRows([
+    { name: "概览", rows: overview },
+    { name: "投递清单", rows: applications },
+  ]);
+  assert.equal(rows, applications);
+  assert.deepEqual(companyRolesFromTable(rows), [
+    { company: "懂车帝", role: "产品&运营岗" },
+    { company: "韶音科技", role: "产品GTM培训生" },
+  ]);
 });
