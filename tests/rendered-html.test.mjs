@@ -66,3 +66,14 @@ test("uses Microsoft YaHei and larger typography for applications and navigation
   assert.match(css, /table\{font-size:14px\}/);
   assert.match(css, /\.company-cell strong\{font-size:16px\}/);
 });
+
+test("offers a confirmed delete action on every application row", async () => {
+  const [page, css] = await Promise.all([
+    readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
+  ]);
+  assert.match(page, /className="application-row-actions"/);
+  assert.match(page, /className="row-delete"/);
+  assert.match(page, /deleteItem\(`\/api\/applications\?id=\$\{item\.id\}`/);
+  assert.match(css, /\.row-delete\{/);
+});
