@@ -1,4 +1,21 @@
-# vinext-starter
+# LuLu‘s 秋招投递管家
+
+一站式管理收藏、投递、日程、面试复盘与 Offer。前端通过 GitHub Pages
+发布，个人记录保存在独立的 GitHub 私有仓库中，以支持手机和电脑共享同一份数据。
+
+## GitHub Pages
+
+仓库包含 `.github/workflows/pages.yml`，推送到 `main` 后自动构建并发布。
+在仓库 Settings → Pages 中选择 GitHub Actions。公开仓库只保存程序代码；
+网页首次打开时要求填写仅有私有数据仓库 Contents 读写权限的 Fine-grained token，
+密钥只保存在当前浏览器的 localStorage 中。
+
+```bash
+npm install
+npm run build:github
+```
+
+## Sites / 本地开发
 
 A clean full-stack starter running on
 [vinext](https://github.com/cloudflare/vinext), with optional Cloudflare D1 and
