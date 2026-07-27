@@ -91,3 +91,12 @@ test("tracks and compares application channels", async () => {
   assert.match(route, /"source"/);
   assert.match(exporter, /"投递渠道": item\.source/);
 });
+
+test("searches applications by company and role with multiple keywords", async () => {
+  const page = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
+  assert.match(page, /function applicationMatchesSearch/);
+  assert.match(page, /terms\.every\(term=>searchable\.includes\(term\)\)/);
+  assert.match(page, /按公司名称或岗位名称搜索投递记录/);
+  assert.match(page, /找到 \$\{filteredApps\.length\} 条匹配记录/);
+  assert.match(page, /aria-label="清空搜索"/);
+});
