@@ -116,3 +116,19 @@ test("uses the supplied good-things collage as a clear responsive wallpaper", as
   assert.match(css, /\.app-shell\{background-color:transparent;background-image:url/);
   assert.match(css, /background:rgb\(255 255 255 \/ 62%\)/);
 });
+
+test("ships a public edition with isolated browser storage and no private repository connection", async () => {
+  const [entry, html, store, config] = await Promise.all([
+    readFile(new URL("../community/main.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../community/index.html", import.meta.url), "utf8"),
+    readFile(new URL("../lib/github-data-store.ts", import.meta.url), "utf8"),
+    readFile(new URL("../vite.public.config.ts", import.meta.url), "utf8"),
+  ]);
+  assert.match(entry, /__LULU_LOCAL_DATA__ = true/);
+  assert.match(entry, /delete window\.__LULU_GITHUB_DATA__/);
+  assert.doesNotMatch(entry, /lulus-autumn-data/);
+  assert.match(html, /秋招投递管家｜公用版/);
+  assert.match(store, /career-tracker-public-data-v1/);
+  assert.match(store, /career-tracker-public-cache-v1/);
+  assert.match(config, /base: "\/career-tracker\/"/);
+});

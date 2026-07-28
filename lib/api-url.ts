@@ -5,6 +5,7 @@ declare global {
       owner: string;
       repo: string;
     };
+    __LULU_LOCAL_DATA__?: boolean;
   }
 }
 

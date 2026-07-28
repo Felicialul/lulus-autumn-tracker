@@ -6,6 +6,9 @@ type TrackerData = Record<CollectionName, JsonRecord[]> & { settings: JsonRecord
 
 const TOKEN_KEY = "lulu-github-data-token-v1";
 const DATA_FILE = "tracker.json";
+const PUBLIC_DATA_KEY = "career-tracker-public-data-v1";
+const PRIVATE_CACHE_KEY = "lulu-autumn-tracker-cache-v2";
+const PUBLIC_CACHE_KEY = "career-tracker-public-cache-v1";
 const EMPTY_DATA: TrackerData = {
   applications: [], interviews: [], timeline: [], notes: [], prospects: [], offers: [], attachments: [], settings: null,
 };
@@ -18,6 +21,14 @@ function config() {
 
 export function isGithubDataMode() {
   return Boolean(config());
+}
+
+export function isLocalDataMode() {
+  return typeof window !== "undefined" && Boolean(window.__LULU_LOCAL_DATA__);
+}
+
+export function trackerCacheKey() {
+  return isLocalDataMode() ? PUBLIC_CACHE_KEY : PRIVATE_CACHE_KEY;
 }
 
 export function getStoredGithubToken() {
@@ -119,6 +130,20 @@ async function writeData(data: TrackerData, sha: string) {
   if (!response.ok) throw new Error(payload.message || "保存云端数据失败");
 }
 
+async function readLocalData(): Promise<{ data: TrackerData; sha: string }> {
+  const saved = localStorage.getItem(PUBLIC_DATA_KEY);
+  if (!saved) return { data: structuredClone(EMPTY_DATA), sha: "" };
+  try {
+    return { data: normalizeData(JSON.parse(saved)), sha: "" };
+  } catch {
+    throw new Error("本机数据格式异常，请清理浏览器数据后重试");
+  }
+}
+
+async function writeLocalData(data: TrackerData) {
+  localStorage.setItem(PUBLIC_DATA_KEY, JSON.stringify(data));
+}
+
 function json(payload: unknown, status = 200) {
   return new Response(JSON.stringify(payload), { status, headers: { "Content-Type": "application/json; charset=utf-8" } });
 }
@@ -167,13 +192,32 @@ async function mutate(handler: (data: TrackerData) => { payload: unknown; status
   return task;
 }
 
-async function handleGithubApi(path: string, init: RequestInit = {}) {
+let localMutationQueue: Promise<unknown> = Promise.resolve();
+
+async function mutateLocal(handler: (data: TrackerData) => { payload: unknown; status?: number }) {
+  const task = localMutationQueue.then(async () => {
+    const { data } = await readLocalData();
+    const result = handler(data);
+    await writeLocalData(data);
+    return json(result.payload, result.status || 200);
+  });
+  localMutationQueue = task.catch(() => undefined);
+  return task;
+}
+
+async function handleDataApi(
+  path: string,
+  init: RequestInit,
+  readStore: () => Promise<{ data: TrackerData; sha: string }>,
+  mutateStore: (handler: (data: TrackerData) => { payload: unknown; status?: number }) => Promise<Response>,
+  fileError: string,
+) {
   const url = new URL(path, window.location.origin);
   const method = (init.method || "GET").toUpperCase();
   const body = parseBody(init);
-  if (url.pathname === "/api/data" && method === "GET") return json((await readData()).data);
-  if (url.pathname === "/api/files") return json({ error: "GitHub 同步版暂不支持附件上传，请先使用备注或链接保存资料。" }, 501);
-  if (url.pathname === "/api/settings" && method === "PUT") return mutate(data => {
+  if (url.pathname === "/api/data" && method === "GET") return json((await readStore()).data);
+  if (url.pathname === "/api/files") return json({ error: fileError }, 501);
+  if (url.pathname === "/api/settings" && method === "PUT") return mutateStore(data => {
     data.settings = { ...body, id: 1, updatedAt: new Date().toISOString() };
     return { payload: { item: data.settings } };
   });
@@ -181,7 +225,7 @@ async function handleGithubApi(path: string, init: RequestInit = {}) {
   const collection = collectionFor(url.pathname);
   if (!collection) return json({ error: "不支持的数据操作" }, 404);
 
-  if (method === "POST") return mutate(data => {
+  if (method === "POST") return mutateStore(data => {
     const items = data[collection];
     if ((collection === "applications" || collection === "prospects") && Array.isArray(body.items)) {
       const existing = new Set(items.map(duplicateKey));
@@ -209,7 +253,7 @@ async function handleGithubApi(path: string, init: RequestInit = {}) {
     return { payload: { item }, status: 201 };
   });
 
-  if (method === "PATCH") return mutate(data => {
+  if (method === "PATCH") return mutateStore(data => {
     const items = data[collection];
     const index = items.findIndex(item => Number(item.id) === Number(body.id));
     if (index < 0) return { payload: { error: "记录不存在" }, status: 404 };
@@ -220,7 +264,7 @@ async function handleGithubApi(path: string, init: RequestInit = {}) {
     return { payload: { item } };
   });
 
-  if (method === "DELETE") return mutate(data => {
+  if (method === "DELETE") return mutateStore(data => {
     const id = Number(url.searchParams.get("id"));
     const items = data[collection];
     const index = items.findIndex(item => Number(item.id) === id);
@@ -237,7 +281,16 @@ async function handleGithubApi(path: string, init: RequestInit = {}) {
   return json({ error: "不支持的数据操作" }, 405);
 }
 
+async function handleGithubApi(path: string, init: RequestInit = {}) {
+  return handleDataApi(path, init, readData, mutate, "GitHub 同步版暂不支持附件上传，请先使用备注或链接保存资料。");
+}
+
+async function handleLocalApi(path: string, init: RequestInit = {}) {
+  return handleDataApi(path, init, readLocalData, mutateLocal, "公用版暂不支持附件上传，请使用备注或链接保存资料。");
+}
+
 export function apiFetch(path: string, init?: RequestInit) {
+  if (isLocalDataMode() && path.startsWith("/api/")) return handleLocalApi(path, init);
   if (isGithubDataMode() && path.startsWith("/api/")) return handleGithubApi(path, init);
   return fetch(apiUrl(path), init);
 }
