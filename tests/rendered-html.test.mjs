@@ -113,5 +113,6 @@ test("uses the supplied good-things collage as a clear responsive wallpaper", as
   const css = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
   assert.match(css, /background-image:url\("\/background-good-things\.png"\)/);
   assert.match(css, /background-attachment:fixed/);
-  assert.match(css, /\.app-shell\{background:rgb\(247 248 250 \/ 34%\)/);
+  assert.match(css, /\.app-shell\{background-color:transparent;background-image:url/);
+  assert.match(css, /background:rgb\(255 255 255 \/ 62%\)/);
 });
