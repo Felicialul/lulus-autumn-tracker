@@ -22,7 +22,7 @@ export async function generateMetadata(): Promise<Metadata> {
     title: "LuLu‘s 秋招投递管家",
     description: "投递、面试、Offer，一处管理。跨设备同步的个人秋招工作台。",
     icons: { icon: "/favicon.svg", shortcut: "/favicon.svg" },
-    openGraph: { title: "LuLu‘s 秋招投递管家", description: "投递、面试、Offer，一处管理。", images: [{ url: `${origin}/og.png`, width: 1536, height: 910 }] },
+    openGraph: { title: "LuLu‘s 秋招投递管家", description: "投递、面试、Offer，一处管理。", images: [{ url: `${origin}/og.png`, width: 1629, height: 965 }] },
     twitter: { card: "summary_large_image", title: "LuLu‘s 秋招投递管家", description: "投递、面试、Offer，一处管理。", images: [`${origin}/og.png`] },
   };
 }

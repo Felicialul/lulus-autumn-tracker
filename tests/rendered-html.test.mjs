@@ -100,3 +100,11 @@ test("searches applications by company and role with multiple keywords", async (
   assert.match(page, /找到 \$\{filteredApps\.length\} 条匹配记录/);
   assert.match(page, /aria-label="清空搜索"/);
 });
+
+test("provides a reference-inspired global search interaction", async () => {
+  const page = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
+  assert.match(page, /className="global-search"/);
+  assert.match(page, /aria-label="全局搜索公司或岗位"/);
+  assert.match(page, /event\.key==="\/"/);
+  assert.match(page, /if\(e\.key==="Enter"\)setPage\("applications"\)/);
+});
