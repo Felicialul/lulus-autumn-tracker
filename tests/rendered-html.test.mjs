@@ -78,6 +78,19 @@ test("offers a confirmed delete action on every application row", async () => {
   assert.match(css, /\.row-delete\{/);
 });
 
+test("opens valid application links in a safe new tab from the list and detail view", async () => {
+  const [page, css] = await Promise.all([
+    readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
+  ]);
+  assert.match(page, /function externalJobUrl/);
+  assert.match(page, /\["http:","https:"\]\.includes\(url\.protocol\)/);
+  assert.match(page, /target="_blank" rel="noopener noreferrer"/);
+  assert.match(page, /<JobLink url=\{item\.applyUrl\} compact\/>/);
+  assert.match(page, /<JobLink url=\{app\.applyUrl\}\/>/);
+  assert.match(css, /\.job-link\{/);
+});
+
 test("tracks and compares application channels", async () => {
   const [page, route, exporter] = await Promise.all([
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
