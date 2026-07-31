@@ -82,4 +82,3 @@ html,body{min-height:100%;background-color:#66734f}body{background-image:url("/b
 .action-hero{background:linear-gradient(145deg,rgb(239 244 252 / 64%),rgb(249 231 242 / 64%));backdrop-filter:none}.global-search,.filterbar select,.search{background:rgb(255 255 255 / 68%)}
 .mobile-bottom-nav{background:rgb(255 255 255 / 84%)}
 @media(max-width:760px){body{background-image:url("/background-good-things.png");background-position:center top;background-size:auto 100vh;background-attachment:fixed}.app-shell{background-color:transparent;background-image:url("/background-good-things.png");background-position:center top;background-size:auto 100vh;background-attachment:fixed}.topbar{background:rgb(247 248 250 / 72%)}.panel,.table-card,.action-panel,.urgent-panel,.weekly-panel,.dashboard-kpis article,.note-card,.prospect-card,.offer-card,.analysis-metrics article,.settings-section{background:rgb(255 255 255 / 72%)}}
-.pill-AI-面试{background:#eee9f8;color:#675995}

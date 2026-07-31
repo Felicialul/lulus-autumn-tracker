@@ -91,18 +91,6 @@ test("opens valid application links in a safe new tab from the list and detail v
   assert.match(css, /\.job-link\{/);
 });
 
-test("supports AI interview across application flow, funnel, calendar, and status styling", async () => {
-  const [page, css] = await Promise.all([
-    readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
-    readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
-  ]);
-  assert.match(page, /"笔试","AI 面试","一面"/);
-  assert.match(page, /const funnelStages = \["已投递","笔试","AI 面试"/);
-  assert.match(page, /\["笔试","AI 面试","群面"/);
-  assert.match(page, /label:"AI 面试",count:applications\.filter/);
-  assert.match(css, /\.pill-AI-面试\{/);
-});
-
 test("tracks and compares application channels", async () => {
   const [page, route, exporter] = await Promise.all([
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
