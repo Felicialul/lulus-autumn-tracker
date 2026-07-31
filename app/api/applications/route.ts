@@ -28,7 +28,7 @@ async function syncSchedule(application: typeof applications.$inferSelect) {
   if (application.deadlineDate) events.push({ stage:"网申截止", date:application.deadlineDate, time:"23:59", notice:"由投递记录自动生成" });
   if (application.nextEventDate) {
     const [date,time="09:00"] = application.nextEventDate.split("T");
-    const stage = ["笔试","一面","二面","终面","HR面","Offer"].includes(application.stage) ? application.stage : "跟进";
+    const stage = ["笔试","AI 面试","一面","二面","终面","HR面","Offer"].includes(application.stage) ? application.stage : "跟进";
     events.push({ stage, date, time, notice:application.nextAction || "由下一步行动自动生成" });
   }
   for (const event of events) {

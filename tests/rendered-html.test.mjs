@@ -105,6 +105,19 @@ test("tracks and compares application channels", async () => {
   assert.match(exporter, /"投递渠道": item\.source/);
 });
 
+test("supports AI interviews across status, scheduling, funnel, and styling", async () => {
+  const [page, route, css] = await Promise.all([
+    readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/api/applications/route.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
+  ]);
+  assert.match(page, /"笔试","AI 面试","一面"/);
+  assert.match(page, /"笔试","AI 面试","群面"/);
+  assert.match(page, /\{label:"AI 面试",count:/);
+  assert.match(route, /"笔试","AI 面试","一面"/);
+  assert.match(css, /\.pill-AI-面试/);
+});
+
 test("searches applications by company and role with multiple keywords", async () => {
   const page = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
   assert.match(page, /function applicationMatchesSearch/);
