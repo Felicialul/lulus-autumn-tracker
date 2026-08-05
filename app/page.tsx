@@ -83,6 +83,7 @@ export default function Home() {
   const [interviewModal,setInterviewModal]=useState(false); const [editInterview,setEditInterview]=useState<Interview|null>(null); const [interviewForm,setInterviewForm]=useState(emptyInterview); const [calendarMode,setCalendarMode]=useState("月"); const [calendarDate,setCalendarDate]=useState(new Date());
   const [noteModal,setNoteModal]=useState(false); const [editNote,setEditNote]=useState<KnowledgeNote|null>(null); const [noteForm,setNoteForm]=useState(emptyNote); const [noteCategory,setNoteCategory]=useState("全部");
   const [prospectModal,setProspectModal]=useState(false); const [editProspect,setEditProspect]=useState<Prospect|null>(null); const [prospectForm,setProspectForm]=useState(emptyProspect);
+  const [selectedProspectIds,setSelectedProspectIds]=useState<number[]>([]);
   const [prospectImportModal,setProspectImportModal]=useState(false); const [prospectImportText,setProspectImportText]=useState(""); const [prospectImportRows,setProspectImportRows]=useState<ProspectDraft[]>([]); const [prospectImportMessage,setProspectImportMessage]=useState("");
   const [offerModal,setOfferModal]=useState(false); const [editOffer,setEditOffer]=useState<Offer|null>(null); const [offerForm,setOfferForm]=useState(emptyOffer);
   const [settingsForm,setSettingsForm]=useState<Settings>({id:1,targetCount:80,targetIndustries:"",salaryExpectation:"",reminderEnabled:true,reminderLeadHours:24,customTags:""});
@@ -104,6 +105,8 @@ export default function Home() {
   useEffect(()=>{queueMicrotask(()=>void loadData());},[]);
 
   useEffect(()=>{const focusSearch=(event:KeyboardEvent)=>{const target=event.target as HTMLElement|null;if(event.key==="/"&&!target?.matches("input, textarea, select, [contenteditable='true']")){event.preventDefault();globalSearchRef.current?.focus();}};window.addEventListener("keydown",focusSearch);return()=>window.removeEventListener("keydown",focusSearch);},[]);
+
+  useEffect(()=>{setSelectedProspectIds(current=>current.filter(id=>data.prospects.some(item=>item.id===id)));},[data.prospects]);
 
   useEffect(()=>{ if(!settingsForm.reminderEnabled||typeof Notification==="undefined"||Notification.permission!=="granted")return;const timer=window.setInterval(()=>{const now=Date.now();data.interviews.forEach(item=>{if(!item.reminderAt)return;const key=`notified-${item.id}-${item.reminderAt}`;if(sessionStorage.getItem(key))return;const when=new Date(item.reminderAt).getTime();if(when<=now&&when>now-3600000){new Notification(`${item.company} · ${item.stage}`,{body:`${item.date} ${item.time} ${item.role}`});sessionStorage.setItem(key,"1");}});},30000);return()=>clearInterval(timer);},[data.interviews,settingsForm.reminderEnabled]);
 
@@ -134,15 +137,38 @@ export default function Home() {
   function previewProspectText(){const rows=prospectsFromText(prospectImportText);setProspectImportRows(rows);setProspectImportMessage(rows.length?`已识别 ${rows.length} 条，请确认后导入。`:"没有识别到完整的公司名和岗位名，请按示例补充内容。");}
   async function previewProspectFile(file:File){try{const rows=uniqueCompanyRoles(prospectsFromTable(await rowsFromWorkbook(file)));setProspectImportRows(rows);setProspectImportMessage(rows.length?`已从 ${file.name} 识别 ${rows.length} 条，请确认后导入。`:"没有找到“公司名”和“岗位名”两列表头，请检查表格。");}catch{setProspectImportRows([]);setProspectImportMessage("文件解析失败，请确认文件未加密且格式正确。");}}
   async function importProspects(){if(!prospectImportRows.length)return;const result=await requestJson("/api/prospects","POST",{items:prospectImportRows});setProspectImportRows([]);setProspectImportMessage(`成功导入 ${result.imported||0} 条${result.skipped?`，跳过 ${result.skipped} 条重复或空记录`:""}。`);}
+  async function moveProspectToApplications(item:Prospect,submitted=false){
+    const appliedDate=submitted?todayYmd():"";
+    const response=await apiFetch("/api/applications",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({...emptyApplication,company:item.company,role:item.role,stage:submitted?"已投递":"待投递",appliedDate,nextAction:submitted?"7 天后查看投递进度":"完善简历并完成投递",notes:"由收藏池转入"})});
+    const payload=await response.json();if(!response.ok)throw new Error(payload.error||"转入投递失败");
+    const removed=await apiFetch(`/api/prospects?id=${item.id}`,{method:"DELETE"});if(!removed.ok)throw new Error(`“${item.company} · ${item.role}”已创建投递，但移出收藏池失败。`);
+    return payload;
+  }
   async function convertProspect(item:Prospect,submitted=false){
     setSaving(true);setError("");
-    try{
-      const appliedDate=submitted?todayYmd():"";
-      const response=await apiFetch("/api/applications",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({...emptyApplication,company:item.company,role:item.role,stage:submitted?"已投递":"待投递",appliedDate,nextAction:submitted?"7 天后查看投递进度":"完善简历并完成投递",notes:"由收藏池转入"})});
-      const payload=await response.json();if(!response.ok)throw new Error(payload.error||"转入投递失败");
-      const removed=await apiFetch(`/api/prospects?id=${item.id}`,{method:"DELETE"});if(!removed.ok)throw new Error("已创建投递，但移出收藏池失败，请手动删除收藏。");
-      await loadData(true);setPage("applications");
-    }catch(caught){setError(caught instanceof Error?caught.message:"转入投递失败");}finally{setSaving(false);}
+    try{await moveProspectToApplications(item,submitted);setSelectedProspectIds(current=>current.filter(id=>id!==item.id));await loadData(true);setPage("applications");}
+    catch(caught){setError(caught instanceof Error?caught.message:"转入投递失败");}finally{setSaving(false);}
+  }
+  function toggleProspectSelection(id:number){setSelectedProspectIds(current=>current.includes(id)?current.filter(itemId=>itemId!==id):[...current,id]);}
+  function toggleAllProspects(){setSelectedProspectIds(current=>current.length===data.prospects.length?[]:data.prospects.map(item=>item.id));}
+  async function bulkConvertProspects(){
+    const selected=data.prospects.filter(item=>selectedProspectIds.includes(item.id));if(!selected.length)return;
+    if(!confirm(`将选中的 ${selected.length} 个岗位转入“待投递”，并从收藏池移出吗？`))return;
+    setSaving(true);setError("");setNotice("");let moved=0;const failures:string[]=[];
+    for(const item of selected){try{await moveProspectToApplications(item);moved+=1;}catch(caught){failures.push(caught instanceof Error?caught.message:`${item.company}转入失败`);}}
+    await loadData(true);setSelectedProspectIds([]);setSaving(false);
+    if(moved)setNotice(`已将 ${moved} 个岗位转入“待投递”。`);
+    if(failures.length)setError(`${failures.length} 条处理失败：${failures[0]}`);
+    if(moved&&!failures.length)setPage("applications");
+  }
+  async function bulkDeleteProspects(){
+    const selected=data.prospects.filter(item=>selectedProspectIds.includes(item.id));if(!selected.length)return;
+    if(!confirm(`确定删除选中的 ${selected.length} 条收藏吗？此操作不能撤销。`))return;
+    setSaving(true);setError("");setNotice("");let deleted=0;const failures:string[]=[];
+    for(const item of selected){try{const response=await apiFetch(`/api/prospects?id=${item.id}`,{method:"DELETE"});if(!response.ok){const payload=await response.json().catch(()=>({}));throw new Error(payload.error||`${item.company}删除失败`);}deleted+=1;}catch(caught){failures.push(caught instanceof Error?caught.message:`${item.company}删除失败`);}}
+    await loadData(true);setSelectedProspectIds([]);setSaving(false);
+    if(deleted)setNotice(`已删除 ${deleted} 条收藏。`);
+    if(failures.length)setError(`${failures.length} 条删除失败：${failures[0]}`);
   }
   async function loadExampleData(){
     if(!confirm("将添加 3 条可删除的示例记录，继续吗？"))return;
@@ -184,7 +210,7 @@ export default function Home() {
 
       {page==="knowledge"&&<section className="page"><div className="page-head"><div><p>沉淀面试问题、笔试题、话术和公司调研，越投越从容。</p></div><button className="primary" onClick={()=>openNote()}>＋ 新建笔记</button></div><div className="category-tabs"><button className={noteCategory==="全部"?"active":""} onClick={()=>setNoteCategory("全部")}>全部 <span>{data.notes.length}</span></button>{noteCategories.map(category=><button className={noteCategory===category?"active":""} key={category} onClick={()=>setNoteCategory(category)}>{category} <span>{data.notes.filter(n=>n.category===category).length}</span></button>)}</div>{data.notes.filter(n=>noteCategory==="全部"||n.category===noteCategory).length?<div className="note-grid">{data.notes.filter(n=>noteCategory==="全部"||n.category===noteCategory).map(note=><article className="note-card" key={note.id} onClick={()=>openNote(note)}><div><Pill value={note.category}/><button className="more" onClick={e=>{e.stopPropagation();void deleteItem(`/api/notes?id=${note.id}`,"这篇笔记")}}>⋯</button></div><h3>{note.title}</h3><p>{note.content||"还没有正文内容"}</p><footer><span>{note.applicationId&&appById[note.applicationId]?`${appById[note.applicationId].company} · ${appById[note.applicationId].role}`:"通用笔记"}</span><span>{note.tags||"未添加标签"}</span></footer></article>)}</div>:<Empty icon="◇" title="知识库还是空的" copy="每次面试后花 5 分钟复盘，会越来越有价值。" action={<button className="primary" onClick={()=>openNote()}>＋ 写第一篇笔记</button>}/>}</section>}
 
-      {page==="prospects"&&<section className="page"><div className="page-head"><div><p>收藏不是终点，把合适的岗位直接推进到投递流程。</p></div><div className="head-actions"><button className="secondary" onClick={openProspectImport}>⇧ 一键导入</button><button className="primary" onClick={()=>openProspect()}>＋ 添加收藏</button></div></div><div className="list-summary"><span>共 {data.prospects.length} 条收藏</span><span>转为投递后会自动从收藏池移出</span></div><div className="prospect-grid">{data.prospects.map(item=><article className="prospect-card prospect-card-simple" key={item.id}><div className="prospect-top"><Logo name={item.company}/><button className="more" onClick={()=>openProspect(item)}>编辑</button></div><h3>{item.company}</h3><p>{item.role||"岗位待补充"}</p><div className="prospect-actions"><button className="secondary" disabled={saving} onClick={()=>void convertProspect(item)}>去投递</button><button className="primary" disabled={saving} onClick={()=>void convertProspect(item,true)}>标记已投</button></div><footer><button onClick={()=>void deleteItem(`/api/prospects?id=${item.id}`,"这条收藏")}>不再考虑</button></footer></article>)}{!data.prospects.length&&<Empty icon="☆" title="收藏池还是空的" copy="添加公司与岗位，或从 Excel 一次导入。" action={<button className="primary" onClick={()=>openProspect()}>＋ 添加收藏</button>}/>}</div></section>}
+      {page==="prospects"&&<section className="page"><div className="page-head"><div><p>收藏不是终点，把合适的岗位直接推进到投递流程。</p></div><div className="head-actions"><button className="secondary" onClick={openProspectImport}>⇧ 一键导入</button><button className="primary" onClick={()=>openProspect()}>＋ 添加收藏</button></div></div><div className="list-summary"><span>共 {data.prospects.length} 条收藏</span><span>转为投递后会自动从收藏池移出</span></div>{!localMode&&data.prospects.length>0&&<div className="prospect-bulk-toolbar"><label><input type="checkbox" checked={selectedProspectIds.length===data.prospects.length} onChange={toggleAllProspects}/><span>全选当前收藏</span></label><strong>已选 {selectedProspectIds.length} 条</strong><div><button className="secondary" disabled={!selectedProspectIds.length||saving} onClick={()=>void bulkConvertProspects()}>批量去投递</button><button className="danger" disabled={!selectedProspectIds.length||saving} onClick={()=>void bulkDeleteProspects()}>批量删除</button></div></div>}<div className="prospect-grid">{data.prospects.map(item=><article className={cls("prospect-card prospect-card-simple",!localMode&&selectedProspectIds.includes(item.id)&&"selected")} key={item.id}><div className="prospect-top"><div>{!localMode&&<input className="prospect-select" type="checkbox" checked={selectedProspectIds.includes(item.id)} onChange={()=>toggleProspectSelection(item.id)} aria-label={`选择 ${item.company} ${item.role}`}/>}<Logo name={item.company}/></div><button className="more" onClick={()=>openProspect(item)}>编辑</button></div><h3>{item.company}</h3><p>{item.role||"岗位待补充"}</p><div className="prospect-actions"><button className="secondary" disabled={saving} onClick={()=>void convertProspect(item)}>去投递</button><button className="primary" disabled={saving} onClick={()=>void convertProspect(item,true)}>标记已投</button></div><footer><button onClick={()=>void deleteItem(`/api/prospects?id=${item.id}`,"这条收藏")}>不再考虑</button></footer></article>)}{!data.prospects.length&&<Empty icon="☆" title="收藏池还是空的" copy="添加公司与岗位，或从 Excel 一次导入。" action={<button className="primary" onClick={()=>openProspect()}>＋ 添加收藏</button>}/>}</div></section>}
 
 
       {page==="analysis"&&<AnalysisPage applications={data.applications} timeline={data.timeline} distributions={distributions} funnel={funnelWithRates}/>} 

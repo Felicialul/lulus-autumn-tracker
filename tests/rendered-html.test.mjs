@@ -158,3 +158,21 @@ test("ships a public edition with isolated browser storage and no private reposi
   assert.match(store, /career-tracker-public-cache-v1/);
   assert.match(config, /base: "\/career-tracker\/"/);
 });
+
+test("supports private-only bulk actions in the prospect pool", async () => {
+  const [page, css] = await Promise.all([
+    readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
+  ]);
+  assert.match(page, /selectedProspectIds/);
+  assert.match(page, /function bulkConvertProspects/);
+  assert.match(page, /function bulkDeleteProspects/);
+  assert.match(page, /!localMode&&data\.prospects\.length>0/);
+  assert.match(page, /全选当前收藏/);
+  assert.match(page, /已选 \{selectedProspectIds\.length\} 条/);
+  assert.match(page, /批量去投递/);
+  assert.match(page, /批量删除/);
+  assert.match(page, /转入“待投递”/);
+  assert.match(css, /\.prospect-bulk-toolbar\{/);
+  assert.match(css, /\.prospect-card\.selected\{/);
+});
