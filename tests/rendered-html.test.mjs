@@ -176,3 +176,22 @@ test("supports private-only bulk actions in the prospect pool", async () => {
   assert.match(css, /\.prospect-bulk-toolbar\{/);
   assert.match(css, /\.prospect-card\.selected\{/);
 });
+
+test("groups filtered and sorted applications by exact company identity", async () => {
+  const [page, css] = await Promise.all([
+    readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
+  ]);
+  assert.match(page, /companyId\?:number\|string\|null/);
+  assert.match(page, /companyId\?`id:\$\{companyId\}`:`name:\$\{item\.company\.trim\(\)\}`/);
+  assert.match(page, /groupApplicationsByCompany\(filteredApps\)/);
+  assert.match(page, /useState<ApplicationViewMode>\("company"\)/);
+  assert.match(page, /按公司/);
+  assert.match(page, /按岗位/);
+  assert.match(page, /aria-expanded=\{expanded\}/);
+  assert.match(page, /group\.applications\.length\} 个岗位/);
+  assert.match(page, /ApplicationTable applications=\{group\.applications\}/);
+  assert.match(css, /\.company-group-card\{/);
+  assert.match(css, /\.application-view-switch\{/);
+  assert.match(css, /@media\(max-width:760px\)\{\.applications-page \.page-head/);
+});
