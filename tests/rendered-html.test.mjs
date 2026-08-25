@@ -195,3 +195,19 @@ test("groups filtered and sorted applications by exact company identity", async 
   assert.match(css, /\.application-view-switch\{/);
   assert.match(css, /@media\(max-width:760px\)\{\.applications-page \.page-head/);
 });
+
+test("keeps application tables horizontally scrollable in compact desktop windows", async () => {
+  const [page, css] = await Promise.all([
+    readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
+  ]);
+  assert.match(page, /className="table-card application-table" tabIndex=\{0\}/);
+  assert.match(page, /岗位列表，可横向滚动查看完整内容/);
+  assert.match(page, /横向滑动查看完整内容/);
+  assert.match(css, /\.application-table\{[^}]*overflow-x:auto!important/);
+  assert.match(css, /scrollbar-gutter:stable/);
+  assert.match(css, /touch-action:pan-x pan-y/);
+  assert.match(css, /\.company-group-card\{min-width:0/);
+  assert.match(css, /@media\(min-width:761px\) and \(max-width:1180px\)/);
+  assert.match(css, /@media\(max-width:760px\).*\.application-table\{overflow:visible!important/);
+});
