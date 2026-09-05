@@ -15,7 +15,7 @@ test("exports every tracker module to a separate Excel worksheet", () => {
   const workbook = createTrackerWorkbook({
     applications: [application],
     interviews: [], timeline: [], notes: [],
-    prospects: [{ company: "腾讯音乐", role: "校招岗位" }],
+    prospects: [{ company: "腾讯音乐", role: "校招岗位", url: "https://example.com/jobs", notes: "内推码：AbC123\n原文" }],
     attachments: [], offers: [],
     settings: { targetCount: 80, targetIndustries: "互联网", salaryExpectation: "20-30K", reminderEnabled: true, reminderLeadHours: 24, customTags: "Dream" },
   }, new Date("2026-07-22T08:00:00Z"));
@@ -25,5 +25,5 @@ test("exports every tracker module to a separate Excel worksheet", () => {
   const prospectRows = XLSX.utils.sheet_to_json(workbook.Sheets["收藏池"]);
   assert.equal(applicationRows[0]["公司名称"], "百度");
   assert.equal(applicationRows[0]["投递渠道"], "BOSS直聘");
-  assert.deepEqual(prospectRows[0], { "公司名称": "腾讯音乐", "岗位名称": "校招岗位" });
+  assert.deepEqual(prospectRows[0], { "公司名称": "腾讯音乐", "岗位名称": "校招岗位", "岗位链接": "https://example.com/jobs", "内推码": "AbC123", "备注": "内推码：AbC123\n原文" });
 });
