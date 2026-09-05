@@ -21,7 +21,7 @@ test("implements bounded sync, local fallback, and action-first mobile UX", asyn
   assert.match(page, /使用本地数据/);
   assert.match(page, /数据同步失败/);
   assert.match(page, /今日行动/);
-  assert.match(page, /本周投递进度/);
+  assert.match(page, /本周已投递/);
   assert.match(page, /求职漏斗/);
   assert.match(page, /标记已投/);
   assert.match(css, /\.mobile-bottom-nav/);
