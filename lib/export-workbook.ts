@@ -11,6 +11,7 @@ type InterviewRow = { id:number; applicationId:number|null; company:string; role
 type TimelineRow = { id:number; applicationId:number; type:string; title:string; occurredAt:string; notes:string };
 type NoteRow = { id:number; applicationId:number|null; category:string; title:string; content:string; tags:string; createdAt:string; updatedAt:string };
 type ProspectRow = { company:string; role:string; url?:string; notes?:string };
+type FocusCompanyRow = { company:string; notes?:string; createdAt?:string };
 type AttachmentRow = { id:number; entityType:string; entityId:number|null; filename:string; contentType:string; size:number; createdAt:string };
 type OfferRow = { id:number; applicationId:number|null; company:string; role:string; city:string; baseMonthly:number; salaryMonths:number; annualBonus:number; signOn:number; stockAnnual:number; allowanceAnnual:number; housingFundRate:number; overtimeScore:number; growthScore:number; preferenceScore:number; notes:string; createdAt:string };
 type SettingsRow = { targetCount:number; targetIndustries:string; salaryExpectation:string; reminderEnabled:boolean; reminderLeadHours:number; customTags:string };
@@ -21,6 +22,7 @@ export type TrackerExportPayload = {
   timeline: readonly TimelineRow[];
   notes: readonly NoteRow[];
   prospects: readonly ProspectRow[];
+  focusCompanies?: readonly FocusCompanyRow[];
   attachments: readonly AttachmentRow[];
   offers: readonly OfferRow[];
   settings: SettingsRow | null;
@@ -55,10 +57,11 @@ export function createTrackerWorkbook(data: TrackerExportPayload, exportedAt = n
     "日程": data.interviews.length,
     "资料库": data.notes.length,
     "收藏池": data.prospects.length,
+    "重点关注公司": data.focusCompanies?.length || 0,
     "时间线": data.timeline.length,
     "Offer": data.offers.length,
     "附件": data.attachments.length,
-  }], ["导出时间", "投递记录", "日程", "资料库", "收藏池", "时间线", "Offer", "附件"]);
+  }], ["导出时间", "投递记录", "日程", "资料库", "收藏池", "重点关注公司", "时间线", "Offer", "附件"]);
 
   const applicationRows = data.applications.map((item) => ({
     "记录ID": item.id, "公司名称": item.company, "岗位名称": item.role, "城市": item.city, "行业": item.industry,
@@ -85,6 +88,8 @@ export function createTrackerWorkbook(data: TrackerExportPayload, exportedAt = n
   appendSheet(workbook, "资料库", noteRows, ["笔记ID", "关联岗位", "分类", "标题", "正文", "标签", "创建时间", "更新时间"]);
 
   appendSheet(workbook, "收藏池", data.prospects.map((item) => ({ "公司名称": item.company, "岗位名称": item.role, "岗位链接":item.url || "", "内推码":item.notes?.match(/(?:^|\n)(?:内推码|推荐码)\s*[:：]\s*([^\s]+)/u)?.[1] || "", "备注":item.notes || "" })), ["公司名称", "岗位名称", "岗位链接", "内推码", "备注"]);
+
+  appendSheet(workbook, "重点关注公司", (data.focusCompanies || []).map(item => ({ "公司名称": item.company, "备注": item.notes || "", "关注时间": item.createdAt || "" })), ["公司名称", "备注", "关注时间"]);
 
   const timelineRows = data.timeline.map((item) => ({
     "节点ID": item.id, "关联投递ID": item.applicationId, "关联岗位": associatedJob(item.applicationId), "类型": item.type,

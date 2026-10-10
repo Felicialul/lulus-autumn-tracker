@@ -1,7 +1,7 @@
 import { apiUrl } from "./api-url";
 
 type JsonRecord = Record<string, unknown>;
-type CollectionName = "applications" | "interviews" | "timeline" | "notes" | "prospects" | "offers" | "attachments";
+type CollectionName = "applications" | "interviews" | "timeline" | "notes" | "prospects" | "focusCompanies" | "offers" | "attachments";
 type TrackerData = Record<CollectionName, JsonRecord[]> & { settings: JsonRecord | null };
 
 const TOKEN_KEY = "lulu-github-data-token-v1";
@@ -10,7 +10,7 @@ const PUBLIC_DATA_KEY = "career-tracker-public-data-v1";
 const PRIVATE_CACHE_KEY = "lulu-autumn-tracker-cache-v2";
 const PUBLIC_CACHE_KEY = "career-tracker-public-cache-v1";
 const EMPTY_DATA: TrackerData = {
-  applications: [], interviews: [], timeline: [], notes: [], prospects: [], offers: [], attachments: [], settings: null,
+  applications: [], interviews: [], timeline: [], notes: [], prospects: [], focusCompanies: [], offers: [], attachments: [], settings: null,
 };
 
 let mutationQueue: Promise<unknown> = Promise.resolve();
@@ -97,6 +97,7 @@ function normalizeData(value: unknown): TrackerData {
     timeline: Array.isArray(source.timeline) ? source.timeline : [],
     notes: Array.isArray(source.notes) ? source.notes : [],
     prospects: Array.isArray(source.prospects) ? source.prospects : [],
+    focusCompanies: Array.isArray(source.focusCompanies) ? source.focusCompanies : [],
     offers: Array.isArray(source.offers) ? source.offers : [],
     attachments: Array.isArray(source.attachments) ? source.attachments : [],
     settings: source.settings && typeof source.settings === "object" ? source.settings : null,
@@ -167,7 +168,7 @@ function parseBody(init?: RequestInit): JsonRecord {
 
 function collectionFor(pathname: string): CollectionName | null {
   const key = pathname.replace(/^\/api\//, "").split("/")[0];
-  return (["applications", "interviews", "timeline", "notes", "prospects", "offers", "attachments"] as CollectionName[]).includes(key as CollectionName) ? key as CollectionName : null;
+  return (["applications", "interviews", "timeline", "notes", "prospects", "focusCompanies", "offers", "attachments"] as CollectionName[]).includes(key as CollectionName) ? key as CollectionName : null;
 }
 
 function createTimeline(data: TrackerData, application: JsonRecord, title?: string) {
@@ -227,6 +228,13 @@ async function handleDataApi(
 
   if (method === "POST") return mutateStore(data => {
     const items = data[collection];
+    if (collection === "focusCompanies") {
+      const company = String(body.company || "").trim();
+      if (!company) return { payload: { error: "请选择要关注的公司" }, status: 400 };
+      const key = cleanKey(company);
+      const existing = items.find(item => cleanKey(item.company) === key);
+      if (existing) return { payload: { item: existing, skipped: 1 } };
+    }
     if ((collection === "applications" || collection === "prospects") && Array.isArray(body.items)) {
       const existing = new Set(items.map(duplicateKey));
       let skipped = 0;
