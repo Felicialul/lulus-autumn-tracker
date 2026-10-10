@@ -229,6 +229,7 @@ async function handleDataApi(
   if (method === "POST") return mutateStore(data => {
     const items = data[collection];
     if (collection === "focusCompanies") {
+      if (![100,80].includes(Number(body.score)))return { payload: { error: "目标公司仅支持 100 分或 80 分" }, status: 400 };
       const company = String(body.company || "").trim();
       if (!company) return { payload: { error: "请选择要关注的公司" }, status: 400 };
       const key = cleanKey(company);
@@ -265,6 +266,7 @@ async function handleDataApi(
     const items = data[collection];
     const index = items.findIndex(item => Number(item.id) === Number(body.id));
     if (index < 0) return { payload: { error: "记录不存在" }, status: 404 };
+    if (collection === "focusCompanies" && ![100,80].includes(Number(body.score)))return { payload: { error: "目标公司仅支持 100 分或 80 分" }, status: 400 };
     const before = items[index];
     const item: JsonRecord = { ...before, ...body, updatedAt: new Date().toISOString() };
     items[index] = item;

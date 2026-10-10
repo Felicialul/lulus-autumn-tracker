@@ -16,7 +16,7 @@ type Interview = { id:number; applicationId:number|null; company:string; role:st
 type TimelineEvent = { id:number; applicationId:number; type:string; title:string; occurredAt:string; notes:string };
 type KnowledgeNote = { id:number; applicationId:number|null; category:string; title:string; content:string; tags:string; createdAt:string; updatedAt:string };
 type Prospect = { id:number; kind:string; company:string; role:string; city:string; tier:string; deadlineDate:string; url:string; reason:string; notes:string; createdAt:string };
-type FocusCompany = { id:number; company:string; notes?:string; createdAt:string; updatedAt:string };
+type FocusCompany = { id:number; company:string; score?:100|80; notes?:string; createdAt:string; updatedAt:string };
 type Attachment = { id:number; entityType:string; entityId:number|null; filename:string; contentType:string; size:number; createdAt:string };
 type Offer = { id:number; applicationId:number|null; company:string; role:string; city:string; baseMonthly:number; salaryMonths:number; annualBonus:number; signOn:number; stockAnnual:number; allowanceAnnual:number; housingFundRate:number; overtimeScore:number; growthScore:number; preferenceScore:number; notes:string; createdAt:string };
 type Settings = { id:number; targetCount:number; targetIndustries:string; salaryExpectation:string; reminderEnabled:boolean; reminderLeadHours:number; customTags:string };
@@ -71,7 +71,7 @@ function isSubmittedApplication(app:Pick<Application,"stage"|"appliedDate">){
   return Boolean(app.appliedDate)||["已投递","简历评估中","测评","笔试","AI 面试","群面","一面","二面","终面","HR面","Offer","已拒绝（公司）","已回绝（本人）","流程结束"].includes(app.stage);
 }
 
-function applicationCompanyKey(item:Application){const companyId=String(item.companyId??"").trim();return companyId?`id:${companyId}`:`name:${item.company.trim()}`;}
+function applicationCompanyKey(item:Application){return `name:${companyFocusKey(item.company)}`;}
 function applicationStatusGroup(stage:string){if(["AI 面试","群面","一面","二面","终面","HR面"].includes(stage))return "面试中";if(stage==="笔试")return "笔试中";if(stage.includes("拒绝"))return "已拒绝";if(["已回绝（本人）","流程结束"].includes(stage))return "已结束";return stage||"未填写";}
 function groupApplicationsByCompany(applications:Application[]):ApplicationCompanyGroup[]{
   const groups=new Map<string,{key:string;company:string;applications:Application[]}>();
@@ -79,39 +79,37 @@ function groupApplicationsByCompany(applications:Application[]):ApplicationCompa
   return [...groups.values()].map(group=>{const counts=new Map<string,number>();group.applications.forEach(item=>{const label=applicationStatusGroup(item.stage);counts.set(label,(counts.get(label)||0)+1);});return{...group,statusSummary:[...counts.entries()].map(([label,count])=>({label,count}))};});
 }
 
-function FocusCompaniesPage({applications,focused,saving,onToggle,onOpenApplication}:{applications:Application[];focused:FocusCompany[];saving:boolean;onToggle:(company:string)=>void;onOpenApplication:(id:number)=>void}) {
-  const [onlyFocused,setOnlyFocused]=useState(false);
-  const [companyQuery,setCompanyQuery]=useState("");
-  const submitted=useMemo(()=>applications.filter(isSubmittedApplication),[applications]);
-  const groups=useMemo(()=>{
-    const byName=new Map<string,ApplicationCompanyGroup>();
-    groupApplicationsByCompany(submitted).forEach(group=>{
-      const key=companyFocusKey(group.company),previous=byName.get(key);
-      if(previous){
-        const items=[...previous.applications,...group.applications];
-        const statuses=new Map<string,number>();
-        items.forEach(item=>{const label=applicationStatusGroup(item.stage);statuses.set(label,(statuses.get(label)||0)+1);});
-        byName.set(key,{...previous,applications:items,statusSummary:[...statuses].map(([label,count])=>({label,count}))});
-      }else byName.set(key,group);
-    });
-    return [...byName.values()];
-  },[submitted]);
-  const selectedKeys=useMemo(()=>new Set(focused.map(item=>companyFocusKey(item.company))),[focused]);
-  const matched=groups.filter(group=>(!onlyFocused||selectedKeys.has(companyFocusKey(group.company)))&&companyFocusKey(group.company).includes(companyFocusKey(companyQuery))).sort((a,b)=>{
-    const priority=Number(selectedKeys.has(companyFocusKey(b.company)))-Number(selectedKeys.has(companyFocusKey(a.company)));
-    if(priority)return priority;
-    return Math.max(...b.applications.map(app=>new Date(app.updatedAt||app.createdAt||0).getTime()||0))-Math.max(...a.applications.map(app=>new Date(app.updatedAt||app.createdAt||0).getTime()||0));
-  });
-  const selectedCount=groups.filter(group=>selectedKeys.has(companyFocusKey(group.company))).length;
+
+function targetScore(item?:FocusCompany):100|80|null {
+  if(!item)return null;
+  return Number(item.score)===80?80:100; // Existing starred companies default to 100 points.
+}
+function CompanyTargetSelector({company,score,saving,canMark,onChange}:{company:string;score:100|80|null;saving:boolean;canMark:boolean;onChange:(company:string,score:100|80|null)=>void}) {
+  if(!canMark)return <span className="target-unavailable">投递后可标目标</span>;
+  return <select className={cls("target-company-select",score===100&&"score-100",score===80&&"score-80")} aria-label={`设置 ${company} 的目标公司分级`} value={score===null?"":String(score)} disabled={saving} onChange={event=>onChange(company,event.target.value?Number(event.target.value) as 100|80:null)}>
+    <option value="">☆ 标记目标</option><option value="100">★ 100 分公司</option><option value="80">★ 80 分公司</option>
+  </select>;
+}
+function CompanyCard({group,score,saving,canMark,onChange,onOpenApplication}:{group:ApplicationCompanyGroup;score:100|80|null;saving:boolean;canMark:boolean;onChange:(company:string,score:100|80|null)=>void;onOpenApplication:(id:number)=>void}) {
+  return <article className={cls("focus-card",score!==null&&"is-focused",score===100&&"is-100",score===80&&"is-80")}>
+    <div className="focus-card-head"><Logo name={group.company}/><div><h3>{group.company}</h3><small>{group.applications.length} 个岗位</small></div><CompanyTargetSelector company={group.company} score={score} saving={saving} canMark={canMark} onChange={onChange}/></div>
+    <div className="focus-statuses">{group.statusSummary.map(item=><span key={item.label}>{item.label} · {item.count}</span>)}</div>
+    <div className="focus-roles">{group.applications.map(app=><button key={app.id} type="button" onClick={()=>onOpenApplication(app.id)}><span><b>{app.role}</b><small>{app.appliedDate?formatDate(app.appliedDate,true):"未填写投递日期"}</small></span><span><Pill value={app.stage}/><i aria-hidden="true">›</i></span></button>)}</div>
+  </article>;
+}
+function FocusCompaniesPage({applications,focused,saving,onSetScore,onOpenApplication,onBrowse}:{applications:Application[];focused:FocusCompany[];saving:boolean;onSetScore:(company:string,score:100|80|null)=>void;onOpenApplication:(id:number)=>void;onBrowse:()=>void}) {
+  const groups=useMemo(()=>groupApplicationsByCompany(applications.filter(isSubmittedApplication)),[applications]);
+  const focusedMap=useMemo(()=>new Map(focused.map(item=>[companyFocusKey(item.company),item])),[focused]);
+  const tiers=([100,80] as const).map(score=>({score,groups:groups.filter(group=>targetScore(focusedMap.get(companyFocusKey(group.company)))===score)}));
+  const total=tiers[0].groups.length+tiers[1].groups.length;
   return <section className="page focus-companies-page">
-    <div className="page-head"><div><p>已投递的公司自动汇总到这里；标星后置顶，方便重点跟进，不需要重复录入。</p></div></div>
-    <div className="focus-summary"><article><span>已投递公司</span><strong>{groups.length}</strong><small>自动按公司去重</small></article><article><span>重点关注</span><strong>{selectedCount}</strong><small>跨设备同步星标</small></article><article><span>涉及岗位</span><strong>{submitted.length}</strong><small>查看每个岗位的状态</small></article></div>
-    <div className="focus-toolbar"><div className="focus-switch"><button className={!onlyFocused?"active":""} onClick={()=>setOnlyFocused(false)}>全部已投公司 ({groups.length})</button><button className={onlyFocused?"active":""} onClick={()=>setOnlyFocused(true)}>★ 重点关注 ({selectedCount})</button></div><input aria-label="搜索目标公司" type="search" placeholder="搜索公司名称" value={companyQuery} onChange={event=>setCompanyQuery(event.target.value)}/></div>
-    {matched.length?<div className="focus-grid">{matched.map(group=>{const following=selectedKeys.has(companyFocusKey(group.company));return <article className={cls("focus-card",following&&"is-focused")} key={companyFocusKey(group.company)}>
-      <div className="focus-card-head"><Logo name={group.company}/><div><h3>{group.company}</h3><small>{group.applications.length} 个已投岗位</small></div><button type="button" className={cls("focus-star",following&&"active")} disabled={saving} aria-pressed={following} aria-label={`${following?"取消关注":"重点关注"} ${group.company}`} onClick={()=>onToggle(group.company)}>{following?"★ 已关注":"☆ 重点关注"}</button></div>
-      <div className="focus-statuses">{group.statusSummary.map(item=><span key={item.label}>{item.label} · {item.count}</span>)}</div>
-      <div className="focus-roles">{group.applications.map(app=><button key={app.id} onClick={()=>onOpenApplication(app.id)}><span><b>{app.role}</b><small>{app.appliedDate?formatDate(app.appliedDate,true):"已进入投递流程"}</small></span><span><Pill value={app.stage}/><i aria-hidden="true">›</i></span></button>)}</div>
-    </article>})}</div>:<Empty icon="☆" title={onlyFocused?"还没有重点关注的公司":companyQuery?"没有匹配的公司":"还没有已投递的公司"} copy={onlyFocused?"切换到“全部已投公司”，给想重点跟进的公司点亮星标。":companyQuery?"试试其他公司名称。":"在求职管理中把岗位标记为已投递后，公司会自动显示在这里。"} action={onlyFocused?<button className="secondary" onClick={()=>setOnlyFocused(false)}>查看全部公司</button>:undefined}/>}
+    <div className="page-head"><div><p>只展示主动标记的目标公司：100 分是最想去的公司，80 分是重点考虑的公司。</p></div><button className="secondary" onClick={onBrowse}>去求职管理标记 →</button></div>
+    <div className="target-score-summary"><article className="tier-100"><span>100 分公司</span><strong>{tiers[0].groups.length}</strong><small>最想去 · 优先准备</small></article><article className="tier-80"><span>80 分公司</span><strong>{tiers[1].groups.length}</strong><small>重点考虑 · 持续跟进</small></article></div>
+    {!total&&<div className="target-first-step"><span>☆</span><strong>还没有标记目标公司</strong><p>进入「求职管理 → 按公司」，选择公司卡片上的 100 分或 80 分，即可在这里看到。</p><button className="primary" onClick={onBrowse}>去标记第一家公司</button></div>}
+    {tiers.map(tier=><section className={cls("target-tier-section",tier.score===100?"tier-100":"tier-80")} key={tier.score}>
+      <div className="target-tier-heading"><div><span className="target-tier-icon">{tier.score===100?"★":"☆"}</span><div><h2>{tier.score} 分公司 <small>{tier.groups.length}</small></h2><p>{tier.score===100?"第一梯队 · 最想去的公司":"第二梯队 · 重点关注的机会"}</p></div></div></div>
+      {tier.groups.length?<div className="focus-grid">{tier.groups.map(group=><CompanyCard key={group.key} group={group} score={tier.score} saving={saving} canMark onChange={onSetScore} onOpenApplication={onOpenApplication}/>)}</div>:<div className="target-tier-empty">暂无 {tier.score} 分公司 · 可在求职管理中标记</div>}
+    </section>)}
   </section>;
 }
 
@@ -137,7 +135,7 @@ export default function Home() {
   const [mobileNav,setMobileNav]=useState(false); const [trendDays,setTrendDays]=useState(30);
   const [quickMenu,setQuickMenu]=useState(false);
   const [search,setSearch]=useState(""); const [stageFilter,setStageFilter]=useState("全部"); const [channelFilter,setChannelFilter]=useState("全部"); const [industryFilter,setIndustryFilter]=useState("全部"); const [priorityFilter,setPriorityFilter]=useState("全部"); const [sortBy,setSortBy]=useState("最近更新");
-  const [applicationView,setApplicationView]=useState<ApplicationViewMode>("company"); const [expandedCompanyKeys,setExpandedCompanyKeys]=useState<string[]>([]);
+  const [applicationView,setApplicationView]=useState<ApplicationViewMode>("company");
   const [appModal,setAppModal]=useState(false); const [editApp,setEditApp]=useState<Application|null>(null); const [appForm,setAppForm]=useState(emptyApplication); const [detailApp,setDetailApp]=useState<Application|null>(null);
   const [interviewModal,setInterviewModal]=useState(false); const [editInterview,setEditInterview]=useState<Interview|null>(null); const [interviewForm,setInterviewForm]=useState(emptyInterview); const [calendarMode,setCalendarMode]=useState("月"); const [calendarDate,setCalendarDate]=useState(new Date());
   const [noteModal,setNoteModal]=useState(false); const [editNote,setEditNote]=useState<KnowledgeNote|null>(null); const [noteForm,setNoteForm]=useState(emptyNote); const [noteCategory,setNoteCategory]=useState("全部");
@@ -180,10 +178,11 @@ export default function Home() {
   const todos=useMemo<TodoItem[]>(()=>{const today=todayYmd();const interviews=data.interviews.filter(i=>i.date===today).map(i=>({type:i.stage,title:`${i.company} · ${i.role}`,time:i.time||"时间待定",tone:"pink",urgent:true,applicationId:i.applicationId||undefined}));const deadlines=data.applications.map(a=>({a,days:daysUntil(a.deadlineDate)})).filter(x=>x.days!==null&&x.days!>=0&&x.days!<=3).map(x=>({type:"截止",title:`${x.a.company} · ${x.a.role}`,time:x.days===0?"今天截止":`${x.days} 天后截止`,tone:"orange",urgent:x.days!<=1,applicationId:x.a.id}));const follow=data.applications.filter(a=>a.stage==="已投递"&&daysUntil(a.appliedDate)!<=-7).slice(0,5).map(a=>({type:"跟进",title:`${a.company} · ${a.role}`,time:a.nextAction||"投递超过 7 天，查看进度",tone:"purple",urgent:false,applicationId:a.id}));return[...interviews,...deadlines,...follow];},[data.applications,data.interviews]);
   const filteredApps=useMemo(()=>data.applications.filter(a=>applicationMatchesSearch(a,search)&&(stageFilter==="全部"||a.stage===stageFilter)&&(channelFilter==="全部"||normalizeChannel(a.source)===channelFilter)&&(industryFilter==="全部"||a.industry===industryFilter)&&(priorityFilter==="全部"||a.priority===priorityFilter)).sort((a,b)=>{if(sortBy==="投递时间")return(b.appliedDate||"").localeCompare(a.appliedDate||"");if(sortBy==="面试时间")return(a.nextEventDate||"9999").localeCompare(b.nextEventDate||"9999");if(sortBy==="薪资")return(b.salaryMax||0)-(a.salaryMax||0);return(b.updatedAt||"").localeCompare(a.updatedAt||"");}),[channelFilter,data.applications,industryFilter,priorityFilter,search,sortBy,stageFilter]);
   const companyGroups=useMemo(()=>groupApplicationsByCompany(filteredApps),[filteredApps]);
+  const targetByCompany=useMemo(()=>new Map(data.focusCompanies.map(item=>[companyFocusKey(item.company),item])),[data.focusCompanies]);
+  const submittedCompanyKeys=useMemo(()=>new Set(data.applications.filter(isSubmittedApplication).map(item=>companyFocusKey(item.company))),[data.applications]);
 
   async function requestJson(url:string,method:string,body?:unknown){setSaving(true);setError("");try{const response=await apiFetch(url,{method,headers:body?{"Content-Type":"application/json"}:undefined,body:body?JSON.stringify(body):undefined});const payload=await response.json();if(!response.ok)throw new Error(payload.error||"操作失败");await loadData(true);return payload;}catch(caught){setError(caught instanceof Error?caught.message:"操作失败");throw caught;}finally{setSaving(false);}}
   async function deleteItem(url:string,label:string){if(!confirm(`确定删除${label}吗？`))return;await requestJson(url,"DELETE");}
-  function toggleCompanyGroup(key:string){setExpandedCompanyKeys(current=>current.includes(key)?current.filter(item=>item!==key):[...current,key]);}
 
   function openApp(item?:Application){setEditApp(item||null);setAppForm(item?{...emptyApplication,...item,source:normalizeChannel(item.source)}:emptyApplication);setAppModal(true);}
   async function saveApp(e:FormEvent){e.preventDefault();await requestJson("/api/applications",editApp?"PATCH":"POST",editApp?{...appForm,id:editApp.id}:appForm);setAppModal(false);}
@@ -192,10 +191,13 @@ export default function Home() {
   async function saveInterview(e:FormEvent){e.preventDefault();await requestJson("/api/interviews",editInterview?"PATCH":"POST",editInterview?{...interviewForm,id:editInterview.id}:interviewForm);setInterviewModal(false);}
   function openNote(item?:KnowledgeNote){setEditNote(item||null);setNoteForm(item?{...item}:emptyNote);setNoteModal(true);}
   async function saveNote(e:FormEvent){e.preventDefault();await requestJson("/api/notes",editNote?"PATCH":"POST",editNote?{...noteForm,id:editNote.id}:noteForm);setNoteModal(false);}
-  async function toggleFocusCompany(company:string){
+  async function setFocusCompanyScore(company:string,score:100|80|null){
     const entry=data.focusCompanies.find(item=>companyFocusKey(item.company)===companyFocusKey(company));
-    if(entry)await requestJson(`/api/focusCompanies?id=${entry.id}`,"DELETE");
-    else await requestJson("/api/focusCompanies","POST",{company});
+    try{
+      if(score===null){if(entry)await requestJson(`/api/focusCompanies?id=${entry.id}`,"DELETE");}
+      else if(entry){if(targetScore(entry)!==score)await requestJson("/api/focusCompanies","PATCH",{id:entry.id,score});}
+      else await requestJson("/api/focusCompanies","POST",{company,score});
+    }catch{/* requestJson already displays the error. */}
   }
   function openProspect(item?:Prospect){setEditProspect(item||null);setProspectForm(item?{...item}:emptyProspect);setProspectModal(true);}
   async function saveProspect(e:FormEvent){e.preventDefault();await requestJson("/api/prospects",editProspect?"PATCH":"POST",editProspect?{...prospectForm,id:editProspect.id}:prospectForm);setProspectModal(false);}
@@ -268,9 +270,12 @@ export default function Home() {
 
       {(page==="analysis"||page==="offers")&&<SectionTabs current={page} onChange={setPage} items={[{key:"analysis",label:"投递分析"},{key:"offers",label:"Offer 对比",count:data.offers.length}]}/>}
 
-      {page==="applications"&&<section className="page applications-page"><div className="page-head"><div><p>管理从收藏、投递到 Offer 的完整生命周期。</p><div className="application-view-switch" role="group" aria-label="投递记录展示方式"><button className={applicationView==="company"?"active":""} onClick={()=>setApplicationView("company")}>按公司</button><button className={applicationView==="role"?"active":""} onClick={()=>setApplicationView("role")}>按岗位</button></div></div><div className="head-actions"><button className="secondary" onClick={()=>document.getElementById("application-import")?.click()}>⇧ 导入 Excel</button><input id="application-import" hidden type="file" accept=".xlsx,.xls,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv" onChange={e=>{const file=e.target.files?.[0];if(file)void importApplications(file);e.target.value="";}}/><button className="primary" onClick={()=>openApp()}>＋ 新增投递</button></div></div><div className="filterbar"><div className="search application-search"><span aria-hidden="true">⌕</span><input type="search" aria-label="按公司名称或岗位名称搜索投递记录" value={search} onChange={e=>setSearch(e.target.value)} onKeyDown={e=>{if(e.key==="Escape")setSearch("")}} placeholder="搜索公司名称或岗位名称，如：腾讯 产品"/>{search&&<button type="button" onClick={()=>setSearch("")} aria-label="清空搜索">×</button>}</div><select value={stageFilter} onChange={e=>setStageFilter(e.target.value)}><option>全部</option>{stages.map(x=><option key={x}>{x}</option>)}</select><select value={channelFilter} onChange={e=>setChannelFilter(e.target.value)}><option>全部</option>{channels.map(x=><option key={x}>{x}</option>)}</select><select value={industryFilter} onChange={e=>setIndustryFilter(e.target.value)}><option>全部</option>{industries.map(x=><option key={x}>{x}</option>)}</select><select value={priorityFilter} onChange={e=>setPriorityFilter(e.target.value)}><option>全部</option>{priorities.map(x=><option key={x}>{x}</option>)}</select><select value={sortBy} onChange={e=>setSortBy(e.target.value)}>{["最近更新","投递时间","面试时间","薪资"].map(x=><option key={x}>{x}</option>)}</select></div><div className="list-summary"><span>{search.trim()?`找到 ${filteredApps.length} 条匹配记录`:`共 ${filteredApps.length} 条记录`}{applicationView==="company"&&filteredApps.length?`，分为 ${companyGroups.length} 家公司`:""}</span><span>{search.trim()?"可输入公司名、岗位名或多个关键词":applicationView==="company"?"点击公司卡片展开岗位":"点击记录查看完整时间线"}</span></div>{filteredApps.length?(applicationView==="company"?<div className="company-group-list">{companyGroups.map(group=>{const expanded=expandedCompanyKeys.includes(group.key);return <article className={cls("company-group-card",expanded&&"expanded")} key={group.key}><button className="company-group-header" onClick={()=>toggleCompanyGroup(group.key)} aria-expanded={expanded}><div className="company-group-identity"><Logo name={group.company}/><div><h3>{group.company}</h3><span>{group.applications.length} 个岗位</span></div></div><div className="company-status-summary">{group.statusSummary.map(item=><span key={item.label}><b>{item.count}</b> {item.label}</span>)}</div><i aria-hidden="true">⌄</i></button>{expanded&&<div className="company-group-body"><ApplicationTable applications={group.applications} saving={saving} onDetail={setDetailApp} onEdit={openApp} onDelete={item=>void deleteItem(`/api/applications?id=${item.id}`,`“${item.company} · ${item.role}”这条投递记录`)}/></div>}</article>})}</div>:<ApplicationTable applications={filteredApps} saving={saving} onDetail={setDetailApp} onEdit={openApp} onDelete={item=>void deleteItem(`/api/applications?id=${item.id}`,`“${item.company} · ${item.role}”这条投递记录`)}/>):<Empty icon="⌕" title="没有找到匹配的投递" copy={search.trim()?`没有找到包含“${search.trim()}”的公司或岗位，请换个关键词。`:"新增第一条记录，或者调整筛选条件。"} action={search.trim()?<button className="secondary" onClick={()=>setSearch("")}>清空搜索</button>:<button className="primary" onClick={()=>openApp()}>＋ 新增投递</button>}/>}</section>}
+      {page==="applications"&&<section className="page applications-page"><div className="page-head"><div><p>管理从收藏、投递到 Offer 的完整生命周期。</p><div className="application-view-switch" role="group" aria-label="投递记录展示方式"><button className={applicationView==="company"?"active":""} onClick={()=>setApplicationView("company")}>按公司 · 双列</button><button className={applicationView==="role"?"active":""} onClick={()=>setApplicationView("role")}>按岗位</button></div></div><div className="head-actions"><button className="secondary" onClick={()=>document.getElementById("application-import")?.click()}>⇧ 导入 Excel</button><input id="application-import" hidden type="file" accept=".xlsx,.xls,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv" onChange={e=>{const file=e.target.files?.[0];if(file)void importApplications(file);e.target.value="";}}/><button className="primary" onClick={()=>openApp()}>＋ 新增投递</button></div></div><div className="filterbar"><div className="search application-search"><span aria-hidden="true">⌕</span><input type="search" aria-label="按公司名称或岗位名称搜索投递记录" value={search} onChange={e=>setSearch(e.target.value)} onKeyDown={e=>{if(e.key==="Escape")setSearch("")}} placeholder="搜索公司名称或岗位名称，如：腾讯 产品"/>{search&&<button type="button" onClick={()=>setSearch("")} aria-label="清空搜索">×</button>}</div><select value={stageFilter} onChange={e=>setStageFilter(e.target.value)}><option>全部</option>{stages.map(x=><option key={x}>{x}</option>)}</select><select value={channelFilter} onChange={e=>setChannelFilter(e.target.value)}><option>全部</option>{channels.map(x=><option key={x}>{x}</option>)}</select><select value={industryFilter} onChange={e=>setIndustryFilter(e.target.value)}><option>全部</option>{industries.map(x=><option key={x}>{x}</option>)}</select><select value={priorityFilter} onChange={e=>setPriorityFilter(e.target.value)}><option>全部</option>{priorities.map(x=><option key={x}>{x}</option>)}</select><select value={sortBy} onChange={e=>setSortBy(e.target.value)}>{["最近更新","投递时间","面试时间","薪资"].map(x=><option key={x}>{x}</option>)}</select></div>
+<div className="list-summary"><span>{search.trim()?`找到 ${filteredApps.length} 条匹配记录`:`共 ${filteredApps.length} 条记录`}{applicationView==="company"&&filteredApps.length?`，分为 ${companyGroups.length} 家公司`:""}</span><span>{search.trim()?"可输入公司名、岗位名或多个关键词":applicationView==="company"?"双列公司卡片 · 可标记 100 分或 80 分目标公司":"点击岗位查看完整时间线"}</span></div>
+{filteredApps.length?(applicationView==="company"?<div className="focus-grid applications-company-grid">{companyGroups.map(group=><CompanyCard key={group.key} group={group} score={targetScore(targetByCompany.get(companyFocusKey(group.company)))} saving={saving} canMark={submittedCompanyKeys.has(companyFocusKey(group.company))} onChange={(company,score)=>void setFocusCompanyScore(company,score)} onOpenApplication={id=>openApplication(id)}/>)}</div>:<ApplicationTable applications={filteredApps} saving={saving} onDetail={setDetailApp} onEdit={openApp} onDelete={item=>void deleteItem(`/api/applications?id=${item.id}`,`“${item.company} · ${item.role}”这条投递记录`)}/>):<Empty icon="⌕" title="没有找到匹配的投递" copy={search.trim()?`没有找到包含“${search.trim()}”的公司或岗位，请换个关键词。`:"新增第一条记录，或者调整筛选条件。"} action={search.trim()?<button className="secondary" onClick={()=>setSearch("")}>清空搜索</button>:<button className="primary" onClick={()=>openApp()}>＋ 新增投递</button>}/>}
+</section>}
 
-      {page==="focusCompanies"&&<FocusCompaniesPage applications={data.applications} focused={data.focusCompanies} saving={saving} onToggle={company=>void toggleFocusCompany(company)} onOpenApplication={id=>openApplication(id)}/>}
+      {page==="focusCompanies"&&<FocusCompaniesPage applications={data.applications} focused={data.focusCompanies} saving={saving} onSetScore={(company,score)=>void setFocusCompanyScore(company,score)} onOpenApplication={id=>openApplication(id)} onBrowse={()=>{setApplicationView("company");setPage("applications");}}/>}
 
       {page==="calendar"&&<CalendarPage interviews={data.interviews} applications={data.applications} mode={calendarMode} setMode={setCalendarMode} date={calendarDate} setDate={setCalendarDate} onAdd={()=>openInterview()} onEdit={openInterview} onDelete={id=>void deleteItem(`/api/interviews?id=${id}`,"这条日程")}/>} 
 
