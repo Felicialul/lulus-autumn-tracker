@@ -28,7 +28,7 @@ type TodoItem = { type:string; title:string; time:string; tone:string; urgent:bo
 const stages = ["待投递","已投递","简历评估中","笔试","AI 面试","一面","二面","终面","HR面","Offer","已拒绝（公司）","已回绝（本人）","流程结束"];
 const funnelStages = ["已投递","笔试","AI 面试","一面","二面","终面","HR面","Offer"];
 const priorities = ["S","A","B","C"];
-const applicationChannels = ["官网","BOSS直聘","牛客","实习僧","内推","猎头","线下投递","其他"];
+const applicationChannels = ["官网","BOSS直聘","牛客","实习僧","内推","猎头","线下投递","微信公众号"];
 const noteCategories = ["面经","笔试题","话术模板","公司档案"];
 const navItems:{key:PageKey;label:string;icon:string}[] = [
   {key:"dashboard",label:"总览",icon:"⌂"},{key:"applications",label:"求职管理",icon:"▤"},{key:"focusCompanies",label:"目标公司",icon:"☆"},{key:"knowledge",label:"资料库",icon:"◇"},{key:"analysis",label:"分析",icon:"⌁"},
